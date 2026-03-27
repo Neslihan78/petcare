@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#6c63ff" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PetCare" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <title>PetCare - Evcil Hayvan Takip</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #6c63ff;
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #2d2d2d;
+      --text-muted: #888;
+      --border: #e2e8f0;
+      --success: #48bb78;
+      --warning: #ed8936;
+      --danger: #f56565;
+      --radius: 12px;
+      --shadow: 0 4px 20px rgba(0,0,0,0.08);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: calc(60px + var(--safe-bottom)); }
+
+    /* HEADER */
+    header {
+      background: var(--primary); color: white; padding: 0 16px;
+      padding-top: env(safe-area-inset-top, 0);
+      height: calc(56px + env(safe-area-inset-top, 0));
+      display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 10px;
+      box-shadow: 0 2px 12px rgba(108,99,255,0.3); position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-size: 1.2rem; font-weight: 700; }
+    .logo span { opacity: 0.75; font-size: 0.95rem; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .icon-btn { background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; }
+    .notif-badge { position: absolute; top: -2px; right: -2px; background: #ff6584; color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.62rem; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+
+    /* BOTTOM NAV */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: calc(56px + var(--safe-bottom));
+      background: white; border-top: 1px solid var(--border);
+      display: flex; z-index: 100;
+      padding-bottom: var(--safe-bottom);
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    }
+    .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: none; cursor: pointer; font-size: 0.65rem; color: var(--text-muted); padding: 0; transition: color 0.15s; }
+    .nav-btn .nav-icon { font-size: 1.3rem; }
+    .nav-btn.active { color: var(--primary); }
+
+    /* LAYOUT */
+    .container { max-width: 700px; margin: 0 auto; padding: 18px 14px; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* STATS */
+    .stats-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+    .stat-card { background: var(--card); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px; cursor: pointer; }
+    .stat-icon { font-size: 1.8rem; }
+    .stat-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .section-header h2 { font-size: 1.1rem; font-weight: 600; }
+
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.875rem; font-weight: 500; transition: opacity 0.15s, transform 0.1s; -webkit-tap-highlight-color: transparent; }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-ghost { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
+    .btn-sm { padding: 5px 11px; font-size: 0.8rem; }
+
+    /* PET GRID */
+    .pet-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    @media(min-width:600px){ .pet-grid { grid-template-columns: repeat(3,1fr); } }
+    .pet-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.18s; }
+    .pet-card:active { transform: scale(0.97); }
+    .pet-card-banner { height: 100px; display: flex; align-items: center; justify-content: center; font-size: 3rem; position: relative; overflow: hidden; }
+    .pet-card-banner img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+    .pet-card-banner .be { position: relative; z-index: 1; }
+    .pet-card-body { padding: 12px; }
+    .pet-card-name { font-size: 1rem; font-weight: 700; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pet-card-meta { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pet-card-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+    .badge { padding: 2px 7px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; }
+    .badge-purple { background: #ede9ff; color: var(--primary); }
+    .badge-green  { background: #e6ffed; color: #2f855a; }
+    .badge-orange { background: #fff3e0; color: #c05621; }
+
+    /* EMPTY */
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+    .empty-state .empty-icon { font-size: 3.5rem; margin-bottom: 12px; }
+    .empty-state p { margin-bottom: 16px; font-size: 0.95rem; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: flex-end; justify-content: center; }
+    @media(min-width:520px){ .modal-overlay { align-items: center; } }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--card); border-radius: 20px 20px 0 0; padding: 20px 20px calc(20px + var(--safe-bottom)); width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: 0 -8px 40px rgba(0,0,0,0.15); }
+    @media(min-width:520px){ .modal { border-radius: 16px; max-width: 500px; padding: 24px; } }
+    .modal-drag { width: 40px; height: 4px; background: var(--border); border-radius: 4px; margin: 0 auto 16px; }
+    .modal h2 { font-size: 1.15rem; margin-bottom: 16px; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+    /* FORM */
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.82rem; font-weight: 500; margin-bottom: 5px; color: var(--text-muted); }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-family: inherit; background: white; -webkit-appearance: none; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    /* EMOJI PICKER */
+    .emoji-grid { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .emoji-opt { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; border-radius: 8px; border: 2px solid var(--border); cursor: pointer; }
+    .emoji-opt.selected { border-color: var(--primary); background: #f0eeff; }
+
+    /* PHOTO */
+    .photo-upload-area { border: 2px dashed var(--border); border-radius: 10px; padding: 16px; text-align: center; cursor: pointer; }
+    .photo-upload-area input[type=file] { display: none; }
+
+    /* DETAIL */
+    .back-btn { display: inline-flex; align-items: center; gap: 5px; color: var(--primary); cursor: pointer; font-weight: 500; margin-bottom: 14px; font-size: 0.9rem; background: none; border: none; padding: 4px 0; }
+    .detail-header { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .detail-avatar { width: 68px; height: 68px; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 2.4rem; flex-shrink: 0; overflow: hidden; }
+    .detail-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .detail-info h1 { font-size: 1.35rem; font-weight: 700; }
+    .detail-info p { color: var(--text-muted); font-size: 0.82rem; margin-top: 3px; }
+    .detail-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+    /* TABS */
+    .tabs-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 14px; }
+    .tabs { display: flex; gap: 4px; background: var(--card); padding: 5px; border-radius: 10px; box-shadow: var(--shadow); width: max-content; min-width: 100%; }
+    .tab-btn { white-space: nowrap; padding: 8px 10px; border: none; border-radius: 7px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: transparent; color: var(--text-muted); -webkit-tap-highlight-color: transparent; }
+    .tab-btn.active { background: var(--primary); color: white; }
+
+    /* LOG */
+    .log-list { display: flex; flex-direction: column; gap: 8px; }
+    .log-item { background: var(--card); border-radius: 10px; box-shadow: var(--shadow); padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+    .log-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .log-text { flex: 1; min-width: 0; }
+    .log-title { font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-date { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
+    .log-note { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; font-style: italic; }
+    .log-delete { background: none; border: none; cursor: pointer; color: var(--danger); font-size: 1rem; padding: 6px; border-radius: 6px; flex-shrink: 0; }
+
+    /* ALERTS */
+    .alert-card { background: #fff8e1; border-left: 4px solid var(--warning); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.84rem; flex-wrap: wrap; }
+    .alert-card.overdue { background: #fff5f5; border-color: var(--danger); }
+    .alert-card.ok { background: #f0fff4; border-color: var(--success); }
+
+    /* WEIGHT CHART */
+    .weight-section { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 12px; }
+    .weight-section h3 { font-size: 0.95rem; margin-bottom: 12px; }
+    canvas#weight-chart { width: 100% !important; }
+    .weight-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .weight-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg); border-radius: 8px; font-size: 0.85rem; }
+    .weight-row .wr-val { font-weight: 700; color: var(--primary); min-width: 55px; }
+    .weight-row .wr-date { color: var(--text-muted); flex: 1; }
+    .weight-row .wr-del { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.85rem; padding: 4px; }
+
+    /* GALLERY */
+    .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    @media(min-width:400px){ .gallery-grid { grid-template-columns: repeat(4, 1fr); } }
+    .gallery-item { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--bg); }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
+    .gallery-item .gal-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 0.7rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .gallery-item .gal-main-btn { position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 4px; font-size: 0.6rem; cursor: pointer; padding: 2px 5px; }
+    .gallery-add { border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: var(--text-muted); cursor: pointer; border-radius: 8px; aspect-ratio: 1; background: var(--bg); }
+
+    /* LIGHTBOX */
+    .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 500; align-items: center; justify-content: center; }
+    .lightbox.open { display: flex; }
+    .lightbox img { max-width: 95vw; max-height: 85vh; border-radius: 8px; object-fit: contain; }
+    .lightbox-close { position: absolute; top: 16px; right: 16px; color: white; font-size: 1.8rem; cursor: pointer; background: rgba(0,0,0,0.5); border: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+    /* REMINDERS */
+    .reminder-item { background: var(--card); border-radius: 10px; box-shadow: var(--shadow); padding: 14px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+    .rem-info { flex: 1; min-width: 0; }
+    .rem-title-text { font-weight: 600; font-size: 0.9rem; }
+    .rem-time { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
+    .rem-pets { font-size: 0.74rem; color: var(--primary); margin-top: 2px; }
+    .toggle-wrap { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: #ccc; border-radius: 24px; cursor: pointer; transition: background 0.2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.2s; }
+    .toggle-wrap input:checked + .toggle-slider { background: var(--primary); }
+    .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* NOTIF PANEL */
+    .notif-panel { display: none; position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); right: 10px; width: min(300px, calc(100vw - 20px)); background: var(--card); border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0,0,0,0.15); z-index: 300; padding: 14px; max-height: 55vh; overflow-y: auto; }
+    .notif-panel.open { display: block; }
+    .notif-panel h3 { font-size: 0.95rem; margin-bottom: 10px; }
+    .notif-row { padding: 8px 10px; background: var(--bg); border-radius: 8px; margin-bottom: 6px; font-size: 0.82rem; }
+    .notif-empty { color: var(--text-muted); text-align: center; padding: 16px 0; font-size: 0.88rem; }
+
+    /* BESLENME PLANI */
+    .meal-plan-grid { display: flex; flex-direction: column; gap: 10px; }
+    .meal-card { background: var(--card); border-radius: 10px; box-shadow: var(--shadow); padding: 14px; display: flex; align-items: center; gap: 12px; }
+    .meal-card.done { opacity: 0.55; }
+    .meal-check { width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; transition: background 0.15s, border-color 0.15s; }
+    .meal-check.checked { background: var(--success); border-color: var(--success); color: white; }
+    .meal-info { flex: 1; }
+    .meal-name { font-weight: 600; font-size: 0.9rem; }
+    .meal-time { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
+    .meal-detail { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; font-style: italic; }
+
+    /* SAĞLIK RAPORU */
+    .report-section { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 12px; }
+    .report-section h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .report-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.85rem; border-bottom: 1px solid #f5f5f5; }
+    .report-row:last-child { border-bottom: none; }
+    .report-row .rr-label { color: var(--text-muted); }
+    .report-row .rr-val { font-weight: 500; }
+
+    /* DATA SHARE */
+    .share-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 12px; text-align: center; }
+    .share-card h3 { font-size: 1rem; margin-bottom: 8px; }
+    .share-card p { font-size: 0.84rem; color: var(--text-muted); margin-bottom: 14px; }
+    .share-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+    /* INSTALL BANNER */
+    .install-banner { background: var(--primary); color: white; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 0.85rem; }
+    .install-banner button { background: white; color: var(--primary); border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.82rem; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+    .install-banner .ib-close { background: transparent; color: white; margin-left: auto; font-size: 1.1rem; padding: 2px 6px; }
+
+    /* PRINT */
+    /* MAP */
+    #map { width: 100%; height: calc(100vh - 56px - 56px - env(safe-area-inset-top,0px) - var(--safe-bottom)); min-height: 300px; border-radius: var(--radius); }
+    .map-search-bar { display: flex; gap: 8px; margin-bottom: 10px; }
+    .map-search-bar select { flex: 1; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.88rem; background: white; }
+    .map-result-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 200px; overflow-y: auto; }
+    .map-result-item { background: var(--card); border-radius: 8px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 0.84rem; display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+    .map-result-item:hover { background: #f0eeff; }
+    .map-result-item .mri-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .map-result-item .mri-name { font-weight: 600; }
+    .map-result-item .mri-addr { color: var(--text-muted); font-size: 0.78rem; margin-top: 2px; }
+    .map-status { text-align: center; padding: 12px; color: var(--text-muted); font-size: 0.85rem; }
+
+    /* ID CARD */
+    .id-card { background: linear-gradient(135deg, #6c63ff 0%, #8b84ff 100%); color: white; border-radius: 16px; padding: 20px; max-width: 340px; margin: 0 auto; position: relative; overflow: hidden; box-shadow: 0 8px 24px rgba(108,99,255,0.4); }
+    .id-card::before { content: ''; position: absolute; width: 180px; height: 180px; border-radius: 50%; background: rgba(255,255,255,0.08); top: -60px; right: -40px; }
+    .id-card .idc-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+    .id-card .idc-avatar { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.4); }
+    .id-card .idc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .id-card .idc-name { font-size: 1.35rem; font-weight: 700; }
+    .id-card .idc-breed { font-size: 0.82rem; opacity: 0.8; margin-top: 2px; }
+    .id-card .idc-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .id-card .idc-field label { font-size: 0.65rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; display: block; }
+    .id-card .idc-field span { font-size: 0.85rem; font-weight: 600; }
+    .id-card .idc-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+    .id-card .idc-logo { font-size: 0.75rem; opacity: 0.7; }
+    #qr-container canvas, #qr-container img { width: 54px !important; height: 54px !important; border-radius: 6px; }
+
+    /* EXPENSE */
+    .expense-summary { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 12px; }
+    .exp-sum-card { background: var(--card); border-radius: 10px; box-shadow: var(--shadow); padding: 10px 12px; text-align: center; }
+    .exp-sum-card .esv { font-size: 1.15rem; font-weight: 700; color: var(--primary); }
+    .exp-sum-card .esl { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+    .exp-cat-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
+
+    /* MULTI-PET quick add */
+    .fab { position: fixed; bottom: calc(68px + var(--safe-bottom)); right: 16px; width: 52px; height: 52px; border-radius: 50%; background: var(--primary); color: white; border: none; font-size: 1.5rem; cursor: pointer; box-shadow: 0 4px 16px rgba(108,99,255,0.45); display: flex; align-items: center; justify-content: center; z-index: 90; -webkit-tap-highlight-color: transparent; transition: transform 0.15s; }
+    .fab:active { transform: scale(0.92); }
+
+    @media print {
+      body { padding: 0; background: white; }
+      header, .bottom-nav, .back-btn, .detail-actions, .tabs-scroll, .install-banner, .notif-panel, .fab { display: none !important; }
+      .view { display: block !important; }
+      #view-home, #view-reminders, #view-data, #view-mealplan, #view-map { display: none !important; }
+      .container { padding: 0; max-width: 100%; }
+      .detail-header, .report-section, .weight-section { box-shadow: none; border: 1px solid #ddd; margin-bottom: 10px; break-inside: avoid; }
+      canvas { max-height: 120px; }
+      .log-delete, .wr-del, .gal-del, .gal-main-btn { display: none !important; }
+      #tab-content { display: block !important; }
+      #print-all-sections { display: block !important; }
+    }
+    #print-all-sections { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="install-banner" class="install-banner" style="display:none">
+  <span>📱</span>
+  <span>PetCare'i telefona yükle, internet olmadan kullan!</span>
+  <button id="install-btn">Yükle</button>
+  <button class="ib-close" onclick="document.getElementById('install-banner').style.display='none'">✕</button>
+</div>
+
+<header>
+  <div class="logo">🐾 PetCare <span>Hayvan Takip</span></div>
+  <div class="header-actions">
+    <button class="icon-btn" onclick="toggleNotifPanel()" id="bell-btn">🔔<span class="notif-badge" id="notif-badge" style="display:none">0</span></button>
+  </div>
+</header>
+
+<div class="notif-panel" id="notif-panel">
+  <h3>Bildirimler</h3>
+  <div id="notif-list"></div>
+</div>
+
+<!-- HOME -->
+<div id="view-home" class="view active">
+  <div class="container">
+    <div class="stats-bar" id="stats-bar"></div>
+    <div class="section-header">
+      <h2>Hayvanlarım</h2>
+      <button class="btn btn-primary btn-sm" onclick="openAddPetModal()">+ Ekle</button>
+    </div>
+    <div id="pet-grid" class="pet-grid"></div>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div id="view-detail" class="view">
+  <div class="container">
+    <button class="back-btn" onclick="showHome()">&#8592; Geri</button>
+    <div class="detail-header">
+      <div class="detail-avatar" id="detail-avatar"></div>
+      <div class="detail-info"><h1 id="detail-name"></h1><p id="detail-meta"></p></div>
+      <div class="detail-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openEditPetModal()">Düzenle</button>
+        <button class="btn btn-sm" style="background:#e8f5e9;color:#2e7d32" onclick="showReportForCurrent()">📄 Rapor</button>
+        <button class="btn btn-sm" style="background:#e3f2fd;color:#1565c0" onclick="showIdCard()">🪪 Kimlik</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePet()">Sil</button>
+      </div>
+    </div>
+    <div id="upcoming-alerts"></div>
+    <div class="tabs-scroll">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('feeding')">🍽 Beslenme</button>
+        <button class="tab-btn" onclick="switchTab('mealplan')">📅 Plan</button>
+        <button class="tab-btn" onclick="switchTab('vet')">🏥 Veteriner</button>
+        <button class="tab-btn" onclick="switchTab('vaccine')">💉 Aşı</button>
+        <button class="tab-btn" onclick="switchTab('medicine')">💊 İlaç</button>
+        <button class="tab-btn" onclick="switchTab('weight')">⚖️ Kilo</button>
+        <button class="tab-btn" onclick="switchTab('expense')">💰 Gider</button>
+        <button class="tab-btn" onclick="switchTab('photos')">📷 Fotoğraf</button>
+        <button class="tab-btn" onclick="switchTab('notes')">📝 Notlar</button>
+      </div>
+    </div>
+    <div id="tab-content"></div>
+    <div id="print-all-sections"></div>
+  </div>
+</div>
+
+<!-- REMINDERS -->
+<div id="view-reminders" class="view">
+  <div class="container">
+    <div class="section-header">
+      <h2>🔔 Hatırlatıcılar</h2>
+      <button class="btn btn-primary btn-sm" onclick="openReminderModal()">+ Ekle</button>
+    </div>
+    <div id="reminders-list"></div>
+  </div>
+</div>
+
+<!-- REPORT VIEW -->
+<div id="view-report" class="view">
+  <div class="container">
+    <button class="back-btn" onclick="showDetail(state.currentPetId)">&#8592; Geri</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <h2 id="report-title" style="font-size:1.1rem"></h2>
+      <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Yazdır</button>
+    </div>
+    <div id="report-body"></div>
+  </div>
+</div>
+
+<!-- DATA (share/import/export) -->
+<div id="view-data" class="view">
+  <div class="container">
+    <div class="section-header"><h2>💾 Veri Yönetimi</h2></div>
+
+    <div class="share-card">
+      <h3>📤 Veriyi Dışa Aktar</h3>
+      <p>Tüm hayvan verilerinizi JSON dosyası olarak indirin. Başka bir cihaza aktarabilirsiniz.</p>
+      <div class="share-actions">
+        <button class="btn btn-primary" onclick="exportData()">Tüm Veriyi İndir</button>
+      </div>
+    </div>
+
+    <div class="share-card">
+      <h3>📥 Veriyi İçe Aktar</h3>
+      <p>Daha önce dışa aktardığınız JSON dosyasını yükleyin. <strong>Mevcut veriler korunur.</strong></p>
+      <div class="share-actions">
+        <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()">Dosya Seç</button>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)" />
+      </div>
+    </div>
+
+    <div class="share-card">
+      <h3>🗑️ Tüm Veriyi Sil</h3>
+      <p>Uygulamadaki tüm hayvan ve kayıtları kalıcı olarak siler.</p>
+      <div class="share-actions">
+        <button class="btn btn-danger" onclick="clearAllData()">Tümünü Sil</button>
+      </div>
+    </div>
+
+    <div class="share-card" style="text-align:left">
+      <h3>ℹ️ Uygulama Hakkında</h3>
+      <div class="report-row"><span class="rr-label">Versiyon</span><span class="rr-val">2.0</span></div>
+      <div class="report-row"><span class="rr-label">Depolama</span><span class="rr-val" id="storage-info">—</span></div>
+      <div class="report-row"><span class="rr-label">Hayvan sayısı</span><span class="rr-val" id="pet-count-info">—</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAP VIEW -->
+<div id="view-map" class="view">
+  <div class="container">
+    <div class="map-search-bar">
+      <select id="map-category">
+        <option value="veterinary">🏥 Veteriner</option>
+        <option value="pet_shop">🛒 Petshop</option>
+        <option value="animal_shelter">🏠 Barınak</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="searchNearby()">📍 Yakınımda Ara</button>
+    </div>
+    <div id="map-status" class="map-status" style="display:none"></div>
+    <div id="map"></div>
+    <div id="map-result-list" class="map-result-list"></div>
+  </div>
+</div>
+
+<!-- FAB (quick add pet) -->
+<button class="fab" id="fab-btn" onclick="openAddPetModal()" title="Hayvan Ekle">+</button>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-home" onclick="showHome()"><span class="nav-icon">🏠</span>Ana Sayfa</button>
+  <button class="nav-btn" id="nav-map" onclick="showMapView()"><span class="nav-icon">🗺️</span>Harita</button>
+  <button class="nav-btn" id="nav-reminders" onclick="showReminders()"><span class="nav-icon">🔔</span>Hatırlatıcı</button>
+  <button class="nav-btn" id="nav-data" onclick="showDataView()"><span class="nav-icon">💾</span>Veri</button>
+</nav>
+
+<!-- PET MODAL -->
+<div class="modal-overlay" id="pet-modal">
+  <div class="modal">
+    <div class="modal-drag"></div>
+    <h2 id="pet-modal-title">Hayvan Ekle</h2>
+    <div class="form-group">
+      <label>Profil Fotoğrafı</label>
+      <div class="photo-upload-area" onclick="document.getElementById('pet-photo-input').click()">
+        <input type="file" id="pet-photo-input" accept="image/*" onchange="handlePetPhotoChange(event)" />
+        <div id="pet-photo-preview" style="font-size:1.8rem;color:var(--text-muted)">📷 Fotoğraf seç</div>
+      </div>
+    </div>
+    <div class="form-group"><label>Simge</label><div class="emoji-grid" id="emoji-picker"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label>Ad *</label><input id="pet-name" type="text" placeholder="Hayvanın adı" /></div>
+      <div class="form-group"><label>Tür *</label>
+        <select id="pet-type">
+          <option>Köpek</option><option>Kedi</option><option>Kuş</option><option>Balık</option>
+          <option>Tavşan</option><option>Hamster</option><option>Sürüngen</option><option>Diğer</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Irk</label><input id="pet-breed" type="text" /></div>
+      <div class="form-group"><label>Doğum Tarihi</label><input id="pet-birthdate" type="date" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Cinsiyet</label>
+        <select id="pet-gender"><option value="">Belirtme</option><option>Erkek</option><option>Dişi</option></select>
+      </div>
+      <div class="form-group"><label>Kilo (kg)</label><input id="pet-weight" type="number" step="0.1" /></div>
+    </div>
+    <div class="form-group"><label>Renk / Not</label><input id="pet-color" type="text" /></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closePetModal()">İptal</button>
+      <button class="btn btn-primary" onclick="savePet()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG MODAL -->
+<div class="modal-overlay" id="log-modal">
+  <div class="modal">
+    <div class="modal-drag"></div>
+    <h2 id="log-modal-title">Kayıt Ekle</h2>
+    <div id="log-modal-fields"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeLogModal()">İptal</button>
+      <button class="btn btn-primary" onclick="saveLog()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEAL PLAN MODAL -->
+<div class="modal-overlay" id="meal-modal">
+  <div class="modal">
+    <div class="modal-drag"></div>
+    <h2>Öğün Ekle</h2>
+    <div class="form-row">
+      <div class="form-group"><label>Öğün Adı *</label><input id="mp-name" type="text" placeholder="ör. Sabah Maması" /></div>
+      <div class="form-group"><label>Saat *</label><input id="mp-time" type="time" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Mama Türü</label><input id="mp-food" type="text" placeholder="ör. Kuru mama" /></div>
+      <div class="form-group"><label>Miktar</label><input id="mp-amount" type="text" placeholder="ör. 100g" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeMealModal()">İptal</button>
+      <button class="btn btn-primary" onclick="saveMealPlan()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- REMINDER MODAL -->
+<div class="modal-overlay" id="reminder-modal">
+  <div class="modal">
+    <div class="modal-drag"></div>
+    <h2 id="reminder-modal-title">Hatırlatıcı Ekle</h2>
+    <div class="form-group"><label>Başlık *</label><input id="rem-title" type="text" placeholder="ör. Mama ver" /></div>
+    <div class="form-row">
+      <div class="form-group"><label>Saat *</label><input id="rem-time" type="time" /></div>
+      <div class="form-group"><label>Tekrar</label>
+        <select id="rem-repeat" onchange="toggleDaysGroup()">
+          <option value="daily">Her gün</option>
+          <option value="weekly">Her hafta</option>
+          <option value="custom">Seçili günler</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" id="rem-days-group" style="display:none">
+      <label>Günler</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px" id="rem-days-picker"></div>
+    </div>
+    <div class="form-group">
+      <label>Hayvan(lar)</label>
+      <div id="rem-pets-picker" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
+    </div>
+    <div class="form-group"><label>Not</label><textarea id="rem-note" rows="2"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeReminderModal()">İptal</button>
+      <button class="btn btn-primary" onclick="saveReminder()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close">✕</button>
+  <img id="lightbox-img" src="" alt="" onclick="event.stopPropagation()" />
+</div>
+
+<input type="file" id="gallery-file-input" accept="image/*" multiple style="display:none" onchange="handleGalleryUpload(event)" />
+
+<!-- ID CARD MODAL -->
+<div class="modal-overlay" id="idcard-modal">
+  <div class="modal">
+    <div class="modal-drag"></div>
+    <h2>🪪 Hayvan Kimlik Kartı</h2>
+    <div id="id-card-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('idcard-modal').classList.remove('open')">Kapat</button>
+      <button class="btn btn-primary" onclick="printIdCard()">🖨️ Yazdır / Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== CONSTANTS =====================
+const EMOJIS = ['🐶','🐱','🐰','🐹','🐦','🐠','🦜','🦎','🐢','🐍','🐈','🐕','🐇','🦊','🐾'];
+const DAYS_TR = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+const TAB_CONFIG = {
+  feeding:  { label:'Beslenme',  icon:'🍽', fields:['datetime','amount','food_type','note'] },
+  vet:      { label:'Veteriner', icon:'🏥', fields:['date','reason','vet_name','next_date','note'] },
+  vaccine:  { label:'Aşı',       icon:'💉', fields:['date','vaccine_name','next_date','note'] },
+  medicine: { label:'İlaç',      icon:'💊', fields:['date','medicine_name','dose','duration','note'] },
+  notes:    { label:'Notlar',    icon:'📝', fields:['date','title','note'] },
+};
+
+// ===================== STATE =====================
+let state = { pets:[], reminders:[], currentPetId:null, currentTab:'feeding', editingPetId:null, editingReminderId:null, selectedEmoji:'🐶', pendingPetPhoto:null };
+
+function loadState() {
+  try { const r=localStorage.getItem('petcare_v3'); if(r){const s=JSON.parse(r);state.pets=s.pets||[];state.reminders=s.reminders||[];} } catch(e){}
+}
+function saveState() { localStorage.setItem('petcare_v3',JSON.stringify({pets:state.pets,reminders:state.reminders})); }
+function genId() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+
+// ===================== VIEWS =====================
+const VIEWS = ['home','detail','reminders','report','data','map'];
+function switchView(name) {
+  VIEWS.forEach(v => document.getElementById('view-'+v).classList.toggle('active', v===name));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const map={home:'nav-home',reminders:'nav-reminders',data:'nav-data',map:'nav-map'};
+  if(map[name]) document.getElementById(map[name]).classList.add('active');
+  // show FAB only on home
+  document.getElementById('fab-btn').style.display = name==='home' ? 'flex' : 'none';
+  closeNotifPanel();
+}
+function showHome() { switchView('home'); renderHome(); }
+function showDetail(petId) { state.currentPetId=petId; state.currentTab='feeding'; switchView('detail'); renderDetail(); }
+function showReminders() { switchView('reminders'); renderRemindersList(); }
+function showDataView() { switchView('data'); renderDataView(); }
+function showMapView() { switchView('map'); initMap(); }
+
+// ===================== HOME =====================
+function renderHome() { renderStats(); renderPetGrid(); renderNotifBadge(); }
+
+function renderStats() {
+  const pets=state.pets;
+  const totalLogs=pets.reduce((s,p)=>s+Object.values(p.logs||{}).reduce((a,arr)=>a+arr.length,0),0);
+  const upcoming=getUpcomingAll();
+  const todayRem=getTodayReminders();
+  document.getElementById('stats-bar').innerHTML=`
+    <div class="stat-card"><div class="stat-icon">🐾</div><div><div class="stat-label">Hayvan</div><div class="stat-value">${pets.length}</div></div></div>
+    <div class="stat-card"><div class="stat-icon">📋</div><div><div class="stat-label">Toplam Kayıt</div><div class="stat-value">${totalLogs}</div></div></div>
+    <div class="stat-card" onclick="showReminders()"><div class="stat-icon">⏰</div><div><div class="stat-label">Yaklaşan</div><div class="stat-value">${upcoming.length}</div></div></div>
+    <div class="stat-card" onclick="showReminders()"><div class="stat-icon">🔔</div><div><div class="stat-label">Bugün</div><div class="stat-value">${todayRem.length}</div></div></div>`;
+}
+
+function renderPetGrid() {
+  const grid=document.getElementById('pet-grid');
+  if(!state.pets.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🐾</div><p>Henüz hayvan eklenmedi.</p><button class="btn btn-primary" onclick="openAddPetModal()">İlk Hayvanı Ekle</button></div>`;return;}
+  grid.innerHTML=state.pets.map(p=>{
+    const age=p.birthdate?calcAge(p.birthdate):null;
+    const lc=Object.values(p.logs||{}).reduce((a,arr)=>a+arr.length,0);
+    const up=getUpcomingForPet(p);
+    const lw=getLastWeight(p);
+    const col=petColor(p.type);
+    const banner=p.profilePhoto?`<img src="${esc(p.profilePhoto)}" alt=""/><span class="be" style="text-shadow:0 1px 6px rgba(0,0,0,.4)">${p.emoji}</span>`:`<span class="be">${p.emoji}</span>`;
+    return `<div class="pet-card" onclick="showDetail('${p.id}')">
+      <div class="pet-card-banner" style="background:${col}">${banner}</div>
+      <div class="pet-card-body">
+        <div class="pet-card-name">${esc(p.name)}</div>
+        <div class="pet-card-meta">${esc(p.type)}${p.breed?' · '+esc(p.breed):''}${age?' · '+age:''}</div>
+        <div class="pet-card-badges">
+          ${lw?`<span class="badge badge-green">${lw}kg</span>`:''}
+          ${lc?`<span class="badge badge-purple">${lc} kayıt</span>`:''}
+          ${up.length?`<span class="badge badge-orange">⏰${up.length}</span>`:''}
+        </div>
+      </div></div>`;
+  }).join('');
+}
+
+function getLastWeight(p){const ws=p.weights||[];if(ws.length)return ws[ws.length-1].kg;return p.weight||null;}
+function petColor(t){return({'Köpek':'#ede9ff','Kedi':'#fce4ec','Kuş':'#e3f2fd','Balık':'#e0f7fa','Tavşan':'#f3e5f5','Hamster':'#fff9c4','Sürüngen':'#e8f5e9'}[t]||'#fafafa');}
+function calcAge(d){const n=new Date(),b=new Date(d);let y=n.getFullYear()-b.getFullYear(),m=n.getMonth()-b.getMonth();if(m<0){y--;m+=12;}return y===0?m+' ay':y+' yaş'+(m?' '+m+' ay':'');}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ===================== DETAIL =====================
+function renderDetail(){
+  const pet=getPet();if(!pet)return showHome();
+  const av=document.getElementById('detail-avatar');
+  av.innerHTML=pet.profilePhoto?`<img src="${esc(pet.profilePhoto)}" alt=""/>`:pet.emoji;
+  document.getElementById('detail-name').textContent=pet.name;
+  const lw=getLastWeight(pet);
+  document.getElementById('detail-meta').textContent=pet.type+(pet.breed?' · '+pet.breed:'')+(pet.gender?' · '+pet.gender:'')+(lw?' · '+lw+'kg':'')+(pet.birthdate?' · '+calcAge(pet.birthdate):'');
+  renderUpcomingAlerts();renderTabs();renderTabContent();
+}
+
+function renderTabs(){
+  document.querySelectorAll('.tab-btn').forEach(b=>{const m=b.getAttribute('onclick').match(/'(\w+)'/);if(m)b.classList.toggle('active',m[1]===state.currentTab);});
+}
+function switchTab(t){state.currentTab=t;renderTabs();renderTabContent();}
+
+function renderTabContent(){
+  const pet=getPet(),tab=state.currentTab,el=document.getElementById('tab-content');
+  if(tab==='weight'){renderWeightTab(pet,el);return;}
+  if(tab==='photos'){renderPhotosTab(pet,el);return;}
+  if(tab==='mealplan'){renderMealPlanTab(pet,el);return;}
+  if(tab==='expense'){renderExpenseTab(pet,el);return;}
+  const cfg=TAB_CONFIG[tab],logs=(pet.logs||{})[tab]||[];
+  const addBtn=`<div class="section-header" style="margin-bottom:10px"><span style="color:var(--text-muted);font-size:0.82rem">${logs.length} kayıt</span><button class="btn btn-primary btn-sm" onclick="openLogModal('${tab}')">+ Ekle</button></div>`;
+  if(!logs.length){el.innerHTML=addBtn+`<div class="empty-state"><div class="empty-icon">${cfg.icon}</div><p>${cfg.label} kaydı yok.</p></div>`;return;}
+  el.innerHTML=addBtn+`<div class="log-list">${[...logs].reverse().map((log,ri)=>{
+    const oi=logs.length-1-ri;
+    const dt=log.datetime||log.date||'';
+    const dd=dt?new Date(dt).toLocaleString('tr-TR',{dateStyle:'medium',timeStyle:log.datetime?'short':undefined}):'';
+    let title='';
+    if(tab==='feeding')title=(log.food_type||'Beslenme')+(log.amount?' · '+log.amount:'');
+    else if(tab==='vet')title=log.reason||'Veteriner ziyareti';
+    else if(tab==='vaccine')title=log.vaccine_name||'Aşı';
+    else if(tab==='medicine')title=(log.medicine_name||'İlaç')+(log.dose?' · '+log.dose:'');
+    else if(tab==='notes')title=log.title||'Not';
+    const nd=log.next_date?`<div class="log-note">Sonraki: ${new Date(log.next_date).toLocaleDateString('tr-TR')}</div>`:'';
+    const nt=log.note?`<div class="log-note">${esc(log.note)}</div>`:'';
+    return `<div class="log-item"><div class="log-icon">${cfg.icon}</div><div class="log-text"><div class="log-title">${esc(title)}</div><div class="log-date">${dd}</div>${nd}${nt}</div><button class="log-delete" onclick="deleteLog('${tab}',${oi})">✕</button></div>`;
+  }).join('')}</div>`;
+}
+
+// ===================== WEIGHT TAB =====================
+function renderWeightTab(pet,el){
+  const ws=pet.weights||[];
+  const hdr=`<div class="section-header" style="margin-bottom:10px"><span style="color:var(--text-muted);font-size:0.82rem">${ws.length} ölçüm</span><button class="btn btn-primary btn-sm" onclick="openWeightModal()">+ Ekle</button></div>`;
+  if(!ws.length){el.innerHTML=hdr+`<div class="empty-state"><div class="empty-icon">⚖️</div><p>Kilo kaydı yok.</p></div>`;return;}
+  const sorted=[...ws].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  el.innerHTML=hdr+`<div class="weight-section"><h3>⚖️ Grafik</h3><canvas id="weight-chart" height="130"></canvas></div>
+  <div class="weight-section"><h3>Ölçümler</h3><div class="weight-list">${[...sorted].reverse().map(w=>`<div class="weight-row"><span class="wr-val">${w.kg} kg</span><span class="wr-date">${new Date(w.date).toLocaleDateString('tr-TR')}</span>${w.note?`<span style="color:var(--text-muted);font-size:0.76rem;font-style:italic;flex:1">${esc(w.note)}</span>`:''}<button class="wr-del" onclick="deleteWeight(${ws.indexOf(w)})">✕</button></div>`).join('')}</div></div>`;
+  setTimeout(()=>drawWeightChart(sorted),30);
+}
+
+function drawWeightChart(sorted){
+  const canvas=document.getElementById('weight-chart');if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||300,H=130;
+  canvas.width=W;canvas.height=H;
+  const vals=sorted.map(w=>parseFloat(w.kg));
+  const minV=Math.min(...vals)*0.95,maxV=Math.max(...vals)*1.05||minV+1;
+  const p={t:8,r:16,b:28,l:38},gw=W-p.l-p.r,gh=H-p.t-p.b;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#e2e8f0';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=p.t+(gh/4)*i;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(p.l+gw,y);ctx.stroke();ctx.fillStyle='#aaa';ctx.font='10px sans-serif';ctx.textAlign='right';ctx.fillText((maxV-((maxV-minV)/4)*i).toFixed(1),p.l-3,y+4);}
+  const pts=sorted.map((w,i)=>({x:p.l+(gw/(sorted.length-1||1))*i,y:p.t+gh-((parseFloat(w.kg)-minV)/(maxV-minV||1))*gh}));
+  ctx.beginPath();ctx.moveTo(pts[0].x,p.t+gh);pts.forEach(q=>ctx.lineTo(q.x,q.y));ctx.lineTo(pts[pts.length-1].x,p.t+gh);ctx.closePath();ctx.fillStyle='rgba(108,99,255,0.1)';ctx.fill();
+  ctx.beginPath();ctx.strokeStyle='#6c63ff';ctx.lineWidth=2.5;ctx.lineJoin='round';pts.forEach((q,i)=>i===0?ctx.moveTo(q.x,q.y):ctx.lineTo(q.x,q.y));ctx.stroke();
+  pts.forEach((q,i)=>{ctx.beginPath();ctx.arc(q.x,q.y,4,0,Math.PI*2);ctx.fillStyle='#6c63ff';ctx.fill();ctx.strokeStyle='white';ctx.lineWidth=1.5;ctx.stroke();if(sorted.length<=8||i%Math.ceil(sorted.length/6)===0){ctx.fillStyle='#888';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText(new Date(sorted[i].date).toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'}),q.x,H-4);}});
+}
+
+function openWeightModal(){
+  state.editingLogType='weight';
+  document.getElementById('log-modal-title').textContent='Kilo Ekle';
+  document.getElementById('log-modal-fields').innerHTML=`<div class="form-row"><div class="form-group"><label>Tarih</label><input id="lf-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div><div class="form-group"><label>Kilo (kg) *</label><input id="lf-kg" type="number" step="0.01" placeholder="5.20"/></div></div><div class="form-group"><label>Not</label><textarea id="lf-note" rows="2"></textarea></div>`;
+  document.getElementById('log-modal').classList.add('open');
+}
+function deleteWeight(idx){if(!confirm('Silinsin mi?'))return;getPet().weights.splice(idx,1);saveState();renderTabContent();}
+
+// ===================== MEAL PLAN TAB =====================
+function renderMealPlanTab(pet,el){
+  const meals=(pet.mealPlan||[]).sort((a,b)=>a.time.localeCompare(b.time));
+  const today=new Date().toDateString();
+  if(!pet.mealDone)pet.mealDone={};
+  if(!pet.mealDoneDate||pet.mealDoneDate!==today){pet.mealDone={};pet.mealDoneDate=today;}
+  const hdr=`<div class="section-header" style="margin-bottom:10px"><span style="color:var(--text-muted);font-size:0.82rem">Günlük ${meals.length} öğün</span><button class="btn btn-primary btn-sm" onclick="openMealModal()">+ Öğün</button></div>`;
+  if(!meals.length){el.innerHTML=hdr+`<div class="empty-state"><div class="empty-icon">📅</div><p>Beslenme planı yok.</p></div>`;return;}
+  const doneCount=meals.filter(m=>pet.mealDone[m.id]).length;
+  const progress=`<div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+    <div style="flex:1"><div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:4px">Bugün ${doneCount}/${meals.length} tamamlandı</div>
+    <div style="height:6px;background:#e2e8f0;border-radius:6px;overflow:hidden"><div style="height:100%;width:${meals.length?Math.round(doneCount/meals.length*100):0}%;background:var(--success);border-radius:6px;transition:width .3s"></div></div></div>
+    <span style="font-size:1.4rem">${doneCount===meals.length&&meals.length?'✅':'🍽'}</span></div>`;
+  el.innerHTML=hdr+progress+`<div class="meal-plan-grid">${meals.map(m=>{
+    const done=!!pet.mealDone[m.id];
+    return `<div class="meal-card${done?' done':''}">
+      <div class="meal-check${done?' checked':''}" onclick="toggleMealDone('${m.id}')">${done?'✓':''}</div>
+      <div class="meal-info"><div class="meal-name">${esc(m.name)}</div><div class="meal-time">⏰ ${m.time}</div>${m.food||m.amount?`<div class="meal-detail">${esc(m.food||'')}${m.amount?' · '+esc(m.amount):''}</div>`:''}</div>
+      <button class="log-delete" onclick="deleteMeal('${m.id}')">✕</button></div>`;
+  }).join('')}</div>`;
+}
+
+function openMealModal(){document.getElementById('mp-name').value='';document.getElementById('mp-time').value='';document.getElementById('mp-food').value='';document.getElementById('mp-amount').value='';document.getElementById('meal-modal').classList.add('open');}
+function closeMealModal(){document.getElementById('meal-modal').classList.remove('open');}
+function saveMealPlan(){
+  const name=document.getElementById('mp-name').value.trim(),time=document.getElementById('mp-time').value;
+  if(!name||!time){alert('Ad ve saat gerekli.');return;}
+  const pet=getPet();if(!pet.mealPlan)pet.mealPlan=[];
+  pet.mealPlan.push({id:genId(),name,time,food:document.getElementById('mp-food').value.trim(),amount:document.getElementById('mp-amount').value.trim()});
+  saveState();closeMealModal();renderTabContent();
+}
+function deleteMeal(id){if(!confirm('Silinsin mi?'))return;const pet=getPet();pet.mealPlan=(pet.mealPlan||[]).filter(m=>m.id!==id);saveState();renderTabContent();}
+function toggleMealDone(id){const pet=getPet();if(!pet.mealDone)pet.mealDone={};pet.mealDone[id]=!pet.mealDone[id];saveState();renderTabContent();}
+
+// ===================== PHOTOS TAB =====================
+function renderPhotosTab(pet,el){
+  const photos=pet.photos||[];
+  el.innerHTML=`<div class="section-header" style="margin-bottom:10px"><span style="color:var(--text-muted);font-size:0.82rem">${photos.length} fotoğraf</span><button class="btn btn-primary btn-sm" onclick="document.getElementById('gallery-file-input').click()">+ Ekle</button></div>
+  <div class="gallery-grid">${photos.map((ph,i)=>`<div class="gallery-item"><img src="${esc(ph.data)}" alt="" onclick="openLightbox('${esc(ph.data)}')" /><button class="gal-del" onclick="deletePhoto(${i})">✕</button><button class="gal-main-btn" onclick="setMainPhoto(${i})">${ph.isMain?'★ Ana':'Ana yap'}</button></div>`).join('')}<div class="gallery-add" onclick="document.getElementById('gallery-file-input').click()">+</div></div>`;
+}
+
+function handleGalleryUpload(e){
+  const files=Array.from(e.target.files);if(!files.length)return;
+  const pet=getPet();if(!pet.photos)pet.photos=[];
+  let done=0;
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{pet.photos.push({data:ev.target.result,isMain:pet.photos.length===0&&!pet.profilePhoto});done++;
+      if(done===files.length){if(!pet.profilePhoto&&pet.photos.length>0){pet.profilePhoto=pet.photos.find(p=>p.isMain)?.data||null;}saveState();renderTabContent();renderDetail();}};
+    reader.readAsDataURL(file);
+  });
+  e.target.value='';
+}
+
+function deletePhoto(idx){if(!confirm('Silinsin mi?'))return;const pet=getPet();const wasMain=pet.photos[idx].isMain;pet.photos.splice(idx,1);if(wasMain&&pet.photos.length)pet.photos[0].isMain=true;pet.profilePhoto=pet.photos.find(p=>p.isMain)?.data||null;saveState();renderTabContent();renderDetail();}
+function setMainPhoto(idx){const pet=getPet();pet.photos.forEach((p,i)=>p.isMain=i===idx);pet.profilePhoto=pet.photos[idx].data;saveState();renderTabContent();renderDetail();renderPetGrid();}
+function openLightbox(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').classList.add('open');}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
+
+// ===================== PROFILE PHOTO =====================
+function handlePetPhotoChange(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{state.pendingPetPhoto=ev.target.result;document.getElementById('pet-photo-preview').innerHTML=`<img src="${esc(ev.target.result)}" style="width:70px;height:70px;object-fit:cover;border-radius:50%"/>`;};
+  reader.readAsDataURL(file);
+}
+
+// ===================== UPCOMING =====================
+function renderUpcomingAlerts(){
+  const up=getUpcomingForPet(getPet());
+  const el=document.getElementById('upcoming-alerts');
+  if(!up.length){el.innerHTML='';return;}
+  el.innerHTML=up.map(u=>{const d=u.daysLeft;const cls=d<0?'overdue':d<=3?'':'ok';const msg=d<0?`${Math.abs(d)} gün geçti!`:d===0?'Bugün!':`${d} gün kaldı`;return `<div class="alert-card ${cls}">⏰ <strong>${esc(u.label)}</strong> — ${msg} <span style="color:var(--text-muted);font-size:0.76rem;margin-left:auto">${new Date(u.date).toLocaleDateString('tr-TR')}</span></div>`;}).join('');
+}
+function getUpcomingForPet(pet){
+  const res=[],logs=pet.logs||{},now=new Date();now.setHours(0,0,0,0);
+  const chk=(arr,fn)=>(arr||[]).forEach(l=>{if(l.next_date){const d=Math.round((new Date(l.next_date)-now)/86400000);if(d<=30)res.push({label:fn(l),date:l.next_date,daysLeft:d});}});
+  chk(logs.vet,l=>'Veteriner: '+(l.reason||''));chk(logs.vaccine,l=>'Aşı: '+(l.vaccine_name||''));chk(logs.medicine,l=>'İlaç: '+(l.medicine_name||''));
+  return res.sort((a,b)=>a.daysLeft-b.daysLeft);
+}
+function getUpcomingAll(){return state.pets.flatMap(p=>getUpcomingForPet(p));}
+
+// ===================== PET MODAL =====================
+function openAddPetModal(){state.editingPetId=null;state.selectedEmoji='🐶';state.pendingPetPhoto=null;document.getElementById('pet-modal-title').textContent='Hayvan Ekle';['pet-name','pet-breed','pet-color'].forEach(id=>document.getElementById(id).value='');document.getElementById('pet-type').value='Köpek';document.getElementById('pet-birthdate').value='';document.getElementById('pet-gender').value='';document.getElementById('pet-weight').value='';document.getElementById('pet-photo-preview').innerHTML='📷 Fotoğraf seç';renderEmojiPicker();document.getElementById('pet-modal').classList.add('open');}
+function openEditPetModal(){const pet=getPet();state.editingPetId=pet.id;state.selectedEmoji=pet.emoji;state.pendingPetPhoto=pet.profilePhoto||null;document.getElementById('pet-modal-title').textContent='Düzenle';document.getElementById('pet-name').value=pet.name;document.getElementById('pet-type').value=pet.type;document.getElementById('pet-breed').value=pet.breed||'';document.getElementById('pet-birthdate').value=pet.birthdate||'';document.getElementById('pet-gender').value=pet.gender||'';document.getElementById('pet-weight').value=pet.weight||'';document.getElementById('pet-color').value=pet.color||'';document.getElementById('pet-photo-preview').innerHTML=pet.profilePhoto?`<img src="${esc(pet.profilePhoto)}" style="width:70px;height:70px;object-fit:cover;border-radius:50%"/>`:'📷 Fotoğraf seç';renderEmojiPicker();document.getElementById('pet-modal').classList.add('open');}
+function closePetModal(){document.getElementById('pet-modal').classList.remove('open');}
+function renderEmojiPicker(){document.getElementById('emoji-picker').innerHTML=EMOJIS.map(e=>`<div class="emoji-opt${e===state.selectedEmoji?' selected':''}" onclick="selectEmoji('${e}')">${e}</div>`).join('');}
+function selectEmoji(e){state.selectedEmoji=e;renderEmojiPicker();}
+
+function savePet(){
+  const name=document.getElementById('pet-name').value.trim();
+  if(!name){alert('Ad gerekli.');return;}
+  const data={id:state.editingPetId||genId(),emoji:state.selectedEmoji,profilePhoto:state.pendingPetPhoto||null,name,type:document.getElementById('pet-type').value,breed:document.getElementById('pet-breed').value.trim(),birthdate:document.getElementById('pet-birthdate').value,gender:document.getElementById('pet-gender').value,weight:document.getElementById('pet-weight').value,color:document.getElementById('pet-color').value.trim(),logs:{},weights:[],photos:[],mealPlan:[],mealDone:{},mealDoneDate:null};
+  if(state.editingPetId){const idx=state.pets.findIndex(p=>p.id===state.editingPetId);data.logs=state.pets[idx].logs;data.weights=state.pets[idx].weights||[];data.photos=state.pets[idx].photos||[];data.mealPlan=state.pets[idx].mealPlan||[];data.mealDone=state.pets[idx].mealDone||{};data.mealDoneDate=state.pets[idx].mealDoneDate||null;state.pets[idx]=data;state.currentPetId=data.id;}else{state.pets.push(data);}
+  saveState();closePetModal();state.editingPetId?renderDetail():showHome();
+}
+
+function deletePet(){const pet=getPet();if(!confirm(`"${pet.name}" silinsin mi?`))return;state.pets=state.pets.filter(p=>p.id!==pet.id);saveState();showHome();}
+
+// ===================== LOG MODAL =====================
+function openLogModal(tab){state.editingLogType=tab;document.getElementById('log-modal-title').textContent=TAB_CONFIG[tab].label+' Ekle';renderLogFields(tab);document.getElementById('log-modal').classList.add('open');}
+function closeLogModal(){document.getElementById('log-modal').classList.remove('open');}
+
+function renderLogFields(tab){
+  const today=new Date().toISOString().slice(0,16),td=today.slice(0,10);
+  const f={
+    feeding:`<div class="form-row"><div class="form-group"><label>Tarih & Saat</label><input id="lf-datetime" type="datetime-local" value="${today}"/></div><div class="form-group"><label>Miktar</label><input id="lf-amount" type="text" placeholder="200g"/></div></div><div class="form-group"><label>Mama Türü</label><input id="lf-food_type" type="text"/></div><div class="form-group"><label>Not</label><textarea id="lf-note" rows="2"></textarea></div>`,
+    vet:`<div class="form-row"><div class="form-group"><label>Tarih</label><input id="lf-date" type="date" value="${td}"/></div><div class="form-group"><label>Veteriner</label><input id="lf-vet_name" type="text"/></div></div><div class="form-group"><label>Neden</label><input id="lf-reason" type="text"/></div><div class="form-group"><label>Sonraki</label><input id="lf-next_date" type="date"/></div><div class="form-group"><label>Not</label><textarea id="lf-note" rows="2"></textarea></div>`,
+    vaccine:`<div class="form-row"><div class="form-group"><label>Tarih</label><input id="lf-date" type="date" value="${td}"/></div><div class="form-group"><label>Aşı Adı</label><input id="lf-vaccine_name" type="text"/></div></div><div class="form-group"><label>Sonraki Aşı</label><input id="lf-next_date" type="date"/></div><div class="form-group"><label>Not</label><textarea id="lf-note" rows="2"></textarea></div>`,
+    medicine:`<div class="form-row"><div class="form-group"><label>Tarih</label><input id="lf-date" type="date" value="${td}"/></div><div class="form-group"><label>İlaç</label><input id="lf-medicine_name" type="text"/></div></div><div class="form-row"><div class="form-group"><label>Doz</label><input id="lf-dose" type="text"/></div><div class="form-group"><label>Süre</label><input id="lf-duration" type="text"/></div></div><div class="form-group"><label>Sonraki</label><input id="lf-next_date" type="date"/></div><div class="form-group"><label>Not</label><textarea id="lf-note" rows="2"></textarea></div>`,
+    notes:`<div class="form-row"><div class="form-group"><label>Tarih</label><input id="lf-date" type="date" value="${td}"/></div><div class="form-group"><label>Başlık</label><input id="lf-title" type="text"/></div></div><div class="form-group"><label>Not</label><textarea id="lf-note" rows="4"></textarea></div>`,
+  };
+  document.getElementById('log-modal-fields').innerHTML=f[tab]||'';
+}
+
+function saveLog(){
+  const tab=state.editingLogType;
+  if(tab==='weight'){saveWeightLog();return;}
+  if(tab==='expense'){saveExpenseLog();return;}
+  const cfg=TAB_CONFIG[tab],log={};
+  cfg.fields.forEach(f=>{const el=document.getElementById('lf-'+f);if(el)log[f]=el.value.trim();});
+  const pet=getPet();if(!pet.logs)pet.logs={};if(!pet.logs[tab])pet.logs[tab]=[];pet.logs[tab].push(log);
+  saveState();closeLogModal();renderDetail();
+}
+
+function saveWeightLog(){
+  const kg=document.getElementById('lf-kg').value.trim();if(!kg){alert('Kilo gerekli.');return;}
+  const pet=getPet();if(!pet.weights)pet.weights=[];
+  pet.weights.push({kg:parseFloat(kg),date:document.getElementById('lf-date').value,note:document.getElementById('lf-note').value.trim()});
+  pet.weights.sort((a,b)=>new Date(a.date)-new Date(b.date));
+  saveState();closeLogModal();renderTabContent();renderDetail();
+}
+
+function deleteLog(tab,idx){if(!confirm('Silinsin mi?'))return;getPet().logs[tab].splice(idx,1);saveState();renderTabContent();renderUpcomingAlerts();renderStats();}
+
+// ===================== REPORT =====================
+function showReportForCurrent(){
+  const pet=getPet();if(!pet)return;
+  document.getElementById('report-title').textContent=pet.emoji+' '+pet.name+' — Sağlık Raporu';
+  document.getElementById('report-body').innerHTML=buildReportHTML(pet);
+  switchView('report');
+}
+
+function buildReportHTML(pet){
+  const lw=getLastWeight(pet);
+  const info=`<div class="report-section"><h3>📋 Genel Bilgiler</h3>
+    <div class="report-row"><span class="rr-label">Ad</span><span class="rr-val">${esc(pet.name)}</span></div>
+    <div class="report-row"><span class="rr-label">Tür / Irk</span><span class="rr-val">${esc(pet.type)}${pet.breed?' · '+esc(pet.breed):''}</span></div>
+    <div class="report-row"><span class="rr-label">Cinsiyet</span><span class="rr-val">${pet.gender||'—'}</span></div>
+    <div class="report-row"><span class="rr-label">Doğum Tarihi</span><span class="rr-val">${pet.birthdate?new Date(pet.birthdate).toLocaleDateString('tr-TR'):'—'}</span></div>
+    <div class="report-row"><span class="rr-label">Yaş</span><span class="rr-val">${pet.birthdate?calcAge(pet.birthdate):'—'}</span></div>
+    <div class="report-row"><span class="rr-label">Son Kilo</span><span class="rr-val">${lw?lw+' kg':'—'}</span></div>
+    <div class="report-row"><span class="rr-label">Renk / Not</span><span class="rr-val">${pet.color||'—'}</span></div>
+    <div class="report-row"><span class="rr-label">Rapor Tarihi</span><span class="rr-val">${new Date().toLocaleDateString('tr-TR')}</span></div>
+  </div>`;
+
+  const buildLogSection=(tab,icon,label)=>{
+    const logs=(pet.logs||{})[tab]||[];if(!logs.length)return '';
+    const rows=logs.map(l=>{
+      let title='',dt='';
+      if(tab==='feeding'){title=(l.food_type||'')+(l.amount?' · '+l.amount:'');dt=l.datetime?new Date(l.datetime).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}):'';}
+      else if(tab==='vet'){title=(l.reason||'')+(l.vet_name?' ('+l.vet_name+')':'');dt=l.date?new Date(l.date).toLocaleDateString('tr-TR'):'';}
+      else if(tab==='vaccine'){title=l.vaccine_name||'';dt=l.date?new Date(l.date).toLocaleDateString('tr-TR'):'';}
+      else if(tab==='medicine'){title=(l.medicine_name||'')+(l.dose?' · '+l.dose:'');dt=l.date?new Date(l.date).toLocaleDateString('tr-TR'):'';}
+      else if(tab==='notes'){title=l.title||'';dt=l.date?new Date(l.date).toLocaleDateString('tr-TR'):'';}
+      const nd=l.next_date?` → Sonraki: ${new Date(l.next_date).toLocaleDateString('tr-TR')}`:'';
+      return `<div class="report-row"><span class="rr-label">${dt}${nd}</span><span class="rr-val">${esc(title)}${l.note?'<br><small style="color:#888;font-style:italic">'+esc(l.note)+'</small>':''}</span></div>`;
+    }).join('');
+    return `<div class="report-section"><h3>${icon} ${label} (${logs.length})</h3>${rows}</div>`;
+  };
+
+  const weights=pet.weights||[];
+  const wSection=weights.length?`<div class="report-section"><h3>⚖️ Kilo Geçmişi (${weights.length})</h3>${[...weights].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(w=>`<div class="report-row"><span class="rr-label">${new Date(w.date).toLocaleDateString('tr-TR')}</span><span class="rr-val">${w.kg} kg${w.note?' — '+esc(w.note):''}</span></div>`).join('')}</div>`:'';
+
+  return info+buildLogSection('vet','🏥','Veteriner Ziyaretleri')+buildLogSection('vaccine','💉','Aşılar')+buildLogSection('medicine','💊','İlaçlar')+wSection+buildLogSection('feeding','🍽','Beslenme Kayıtları')+buildLogSection('notes','📝','Notlar');
+}
+
+// ===================== REMINDERS =====================
+function openReminderModal(id){
+  state.editingReminderId=id||null;
+  document.getElementById('reminder-modal-title').textContent=id?'Düzenle':'Hatırlatıcı Ekle';
+  const rem=id?state.reminders.find(r=>r.id===id):null;
+  document.getElementById('rem-title').value=rem?rem.title:'';
+  document.getElementById('rem-time').value=rem?rem.time:'';
+  document.getElementById('rem-repeat').value=rem?rem.repeat:'daily';
+  document.getElementById('rem-note').value=rem?rem.note||'':'';
+  renderDaysPicker(rem?rem.days:[]);
+  renderRemPetsPicker(rem?rem.petIds:[]);
+  toggleDaysGroup();
+  document.getElementById('reminder-modal').classList.add('open');
+}
+function closeReminderModal(){document.getElementById('reminder-modal').classList.remove('open');}
+function toggleDaysGroup(){document.getElementById('rem-days-group').style.display=document.getElementById('rem-repeat').value==='custom'?'block':'none';}
+function renderDaysPicker(sel){document.getElementById('rem-days-picker').innerHTML=DAYS_TR.map((d,i)=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.82rem;background:var(--bg);padding:4px 8px;border-radius:6px"><input type="checkbox" value="${i}"${sel.includes(i)?' checked':''}/> ${d}</label>`).join('');}
+function renderRemPetsPicker(sel){document.getElementById('rem-pets-picker').innerHTML=state.pets.map(p=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.82rem;background:var(--bg);padding:4px 8px;border-radius:6px"><input type="checkbox" value="${p.id}"${sel.includes(p.id)?' checked':''}/> ${p.emoji} ${esc(p.name)}</label>`).join('')||'<span style="color:var(--text-muted);font-size:0.82rem">Hayvan yok</span>';}
+
+function saveReminder(){
+  const title=document.getElementById('rem-title').value.trim(),time=document.getElementById('rem-time').value;
+  if(!title||!time){alert('Başlık ve saat gerekli.');return;}
+  const repeat=document.getElementById('rem-repeat').value;
+  const days=repeat==='custom'?Array.from(document.querySelectorAll('#rem-days-picker input:checked')).map(e=>parseInt(e.value)):[];
+  const petIds=Array.from(document.querySelectorAll('#rem-pets-picker input:checked')).map(e=>e.value);
+  const rem={id:state.editingReminderId||genId(),title,time,repeat,days,petIds,note:document.getElementById('rem-note').value.trim(),enabled:true};
+  if(state.editingReminderId){const idx=state.reminders.findIndex(r=>r.id===state.editingReminderId);state.reminders[idx]=rem;}else{state.reminders.push(rem);}
+  saveState();closeReminderModal();renderRemindersList();renderNotifBadge();
+}
+
+function deleteReminder(id){if(!confirm('Silinsin mi?'))return;state.reminders=state.reminders.filter(r=>r.id!==id);saveState();renderRemindersList();renderNotifBadge();}
+function toggleReminder(id){const rem=state.reminders.find(r=>r.id===id);if(rem)rem.enabled=!rem.enabled;saveState();renderRemindersList();renderNotifBadge();}
+
+function renderRemindersList(){
+  const el=document.getElementById('reminders-list');
+  if(!state.reminders.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🔔</div><p>Hatırlatıcı yok.</p></div>`;return;}
+  el.innerHTML=[...state.reminders].sort((a,b)=>a.time.localeCompare(b.time)).map(rem=>{
+    const pn=rem.petIds.map(id=>{const p=state.pets.find(pp=>pp.id===id);return p?p.emoji+p.name:'';}).filter(Boolean).join(', ');
+    const rl=rem.repeat==='daily'?'Her gün':rem.repeat==='weekly'?'Her hafta':rem.days.map(d=>DAYS_TR[d]).join(', ');
+    return `<div class="reminder-item">
+      <div style="font-size:1.4rem">🔔</div>
+      <div class="rem-info"><div class="rem-title-text">${esc(rem.title)}</div><div class="rem-time">⏰ ${rem.time} · ${rl}</div>${pn?`<div class="rem-pets">${esc(pn)}</div>`:''}</div>
+      <label class="toggle-wrap"><input type="checkbox"${rem.enabled?' checked':''} onchange="toggleReminder('${rem.id}')"/><span class="toggle-slider"></span></label>
+      <button class="btn btn-ghost btn-sm" onclick="openReminderModal('${rem.id}')">Düzenle</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteReminder('${rem.id}')">Sil</button>
+    </div>`;
+  }).join('');
+}
+
+function getTodayReminders(){
+  const dw=(new Date().getDay()+6)%7;
+  return state.reminders.filter(r=>{if(!r.enabled)return false;if(r.repeat==='daily'||r.repeat==='weekly')return true;if(r.repeat==='custom')return r.days.includes(dw);return false;});
+}
+
+// ===================== NOTIF PANEL =====================
+function toggleNotifPanel(){const p=document.getElementById('notif-panel');if(p.classList.contains('open')){closeNotifPanel();return;}renderNotifPanel();p.classList.add('open');}
+function closeNotifPanel(){document.getElementById('notif-panel').classList.remove('open');}
+function renderNotifPanel(){
+  const todayRem=getTodayReminders(),upcoming=getUpcomingAll();
+  let html='';
+  if(todayRem.length)html+=`<div style="font-size:0.72rem;font-weight:600;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase">Bugün</div>`+todayRem.map(r=>`<div class="notif-row"><b>🔔 ${esc(r.title)}</b><br/><span style="color:var(--text-muted)">${r.time}</span></div>`).join('');
+  if(upcoming.length)html+=`<div style="font-size:0.72rem;font-weight:600;color:var(--text-muted);margin:8px 0 5px;text-transform:uppercase">Yaklaşan</div>`+upcoming.slice(0,6).map(u=>{const d=u.daysLeft;const msg=d<0?`${Math.abs(d)}g geçti`:d===0?'Bugün!':d+'g kaldı';return `<div class="notif-row"><b>${esc(u.label)}</b><br/><span style="color:var(--text-muted)">${msg} · ${new Date(u.date).toLocaleDateString('tr-TR')}</span></div>`;}).join('');
+  if(!html)html=`<div class="notif-empty">Yaklaşan bir şey yok.</div>`;
+  document.getElementById('notif-list').innerHTML=html;
+}
+function renderNotifBadge(){const c=getTodayReminders().length+getUpcomingAll().filter(u=>u.daysLeft<=3).length;const b=document.getElementById('notif-badge');b.style.display=c>0?'flex':'none';b.textContent=c>9?'9+':c;}
+
+// ===================== DATA VIEW =====================
+function renderDataView(){
+  const used=new Blob([localStorage.getItem('petcare_v3')||'']).size;
+  const kb=(used/1024).toFixed(1);
+  document.getElementById('storage-info').textContent=kb+' KB kullanılıyor';
+  document.getElementById('pet-count-info').textContent=state.pets.length;
+}
+
+function exportData(){
+  const data=JSON.stringify({pets:state.pets,reminders:state.reminders},null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='petcare-yedek-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function importData(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.pets)throw new Error('Geçersiz dosya');
+      const existing=new Set(state.pets.map(p=>p.id));
+      let added=0;
+      (d.pets||[]).forEach(p=>{if(!existing.has(p.id)){state.pets.push(p);added++;}});
+      (d.reminders||[]).forEach(r=>{if(!state.reminders.find(x=>x.id===r.id))state.reminders.push(r);});
+      saveState();renderDataView();renderNotifBadge();
+      alert(`İçe aktarıldı: ${added} yeni hayvan eklendi.`);
+    }catch(err){alert('Hata: '+err.message);}
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+function clearAllData(){if(!confirm('TÜM veriler silinsin mi? Bu işlem geri alınamaz!'))return;state.pets=[];state.reminders=[];saveState();renderDataView();renderNotifBadge();alert('Tüm veriler silindi.');}
+
+// ===================== EXPENSE TAB =====================
+const EXP_CATS = {vet:'🏥 Veteriner',food:'🍽 Mama',medicine:'💊 İlaç',vaccine:'💉 Aşı',grooming:'✂️ Tıraş',accessory:'🎾 Aksesuar',other:'📦 Diğer'};
+const EXP_COLORS = {vet:'#ede9ff',food:'#e8f5e9',medicine:'#fff3e0',vaccine:'#e3f2fd',grooming:'#fce4ec',accessory:'#f3e5f5',other:'#f5f5f5'};
+
+function renderExpenseTab(pet,el){
+  const expenses=pet.expenses||[];
+  const total=expenses.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  const thisMonth=new Date();
+  const monthExp=expenses.filter(e=>{const d=new Date(e.date);return d.getMonth()===thisMonth.getMonth()&&d.getFullYear()===thisMonth.getFullYear();}).reduce((s,e)=>s+parseFloat(e.amount||0),0);
+  const catTotals={};expenses.forEach(e=>{catTotals[e.category]=(catTotals[e.category]||0)+parseFloat(e.amount||0);});
+  const topCat=Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
+
+  const hdr=`<div class="section-header" style="margin-bottom:10px"><span style="color:var(--text-muted);font-size:0.82rem">${expenses.length} kayıt</span><button class="btn btn-primary btn-sm" onclick="openExpenseModal()">+ Ekle</button></div>`;
+  const summary=`<div class="expense-summary">
+    <div class="exp-sum-card"><div class="esv">${total.toLocaleString('tr-TR')}₺</div><div class="esl">Toplam</div></div>
+    <div class="exp-sum-card"><div class="esv">${monthExp.toLocaleString('tr-TR')}₺</div><div class="esl">Bu Ay</div></div>
+    <div class="exp-sum-card"><div class="esv">${topCat?EXP_CATS[topCat[0]].split(' ')[0]:'—'}</div><div class="esl">En Fazla</div></div>
+  </div>`;
+
+  if(!expenses.length){el.innerHTML=hdr+`<div class="empty-state"><div class="empty-icon">💰</div><p>Harcama kaydı yok.</p></div>`;return;}
+  const items=[...expenses].reverse().map((e,ri)=>{
+    const oi=expenses.length-1-ri;
+    const catLabel=EXP_CATS[e.category]||e.category;
+    const col=EXP_COLORS[e.category]||'#f5f5f5';
+    return `<div class="log-item">
+      <div class="log-icon">${catLabel.split(' ')[0]}</div>
+      <div class="log-text">
+        <div class="log-title" style="display:flex;align-items:center;gap:6px">${esc(e.title||catLabel)} <span class="exp-cat-badge" style="background:${col};color:#333">${catLabel}</span></div>
+        <div class="log-date">${e.date?new Date(e.date).toLocaleDateString('tr-TR'):''}</div>
+        ${e.note?`<div class="log-note">${esc(e.note)}</div>`:''}
+      </div>
+      <div style="font-weight:700;color:var(--primary);flex-shrink:0;font-size:0.95rem">${parseFloat(e.amount).toLocaleString('tr-TR')}₺</div>
+      <button class="log-delete" onclick="deleteExpense(${oi})">✕</button>
+    </div>`;
+  }).join('');
+  el.innerHTML=hdr+summary+`<div class="log-list">${items}</div>`;
+}
+
+function openExpenseModal(){
+  state.editingLogType='expense';
+  document.getElementById('log-modal-title').textContent='Harcama Ekle';
+  const td=new Date().toISOString().slice(0,10);
+  document.getElementById('log-modal-fields').innerHTML=`
+    <div class="form-row">
+      <div class="form-group"><label>Tarih</label><input id="lf-date" type="date" value="${td}"/></div>
+      <div class="form-group"><label>Tutar (₺) *</label><input id="lf-amount" type="number" step="0.01" placeholder="0.00"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Kategori</label><select id="lf-category">${Object.entries(EXP_CATS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Başlık</label><input id="lf-title" type="text" placeholder="ör. Rutin kontrol"/></div>
+    </div>
+    <div class="form-group"><label>Not</label><textarea id="lf-note" rows="2"></textarea></div>`;
+  document.getElementById('log-modal').classList.add('open');
+}
+
+function saveExpenseLog(){
+  const amount=document.getElementById('lf-amount').value.trim();
+  if(!amount){alert('Tutar gerekli.');return;}
+  const pet=getPet();if(!pet.expenses)pet.expenses=[];
+  pet.expenses.push({date:document.getElementById('lf-date').value,amount:parseFloat(amount),category:document.getElementById('lf-category').value,title:document.getElementById('lf-title').value.trim(),note:document.getElementById('lf-note').value.trim()});
+  saveState();closeLogModal();renderTabContent();
+}
+
+function deleteExpense(idx){if(!confirm('Silinsin mi?'))return;getPet().expenses.splice(idx,1);saveState();renderTabContent();}
+
+// ===================== ID CARD =====================
+function showIdCard(){
+  const pet=getPet();if(!pet)return;
+  const lw=getLastWeight(pet);
+  const avatarHtml=pet.profilePhoto?`<img src="${esc(pet.profilePhoto)}" alt=""/>`:(pet.emoji||'🐾');
+  document.getElementById('id-card-content').innerHTML=`
+    <div class="id-card" id="the-id-card">
+      <div class="idc-header">
+        <div class="idc-avatar">${avatarHtml}</div>
+        <div><div class="idc-name">${esc(pet.name)}</div><div class="idc-breed">${esc(pet.type)}${pet.breed?' · '+esc(pet.breed):''}</div></div>
+      </div>
+      <div class="idc-fields">
+        <div class="idc-field"><label>Cinsiyet</label><span>${pet.gender||'—'}</span></div>
+        <div class="idc-field"><label>Kilo</label><span>${lw?lw+' kg':'—'}</span></div>
+        <div class="idc-field"><label>Doğum</label><span>${pet.birthdate?new Date(pet.birthdate).toLocaleDateString('tr-TR'):'—'}</span></div>
+        <div class="idc-field"><label>Yaş</label><span>${pet.birthdate?calcAge(pet.birthdate):'—'}</span></div>
+        <div class="idc-field"><label>Renk</label><span>${pet.color||'—'}</span></div>
+        <div class="idc-field"><label>ID</label><span style="font-size:0.7rem;word-break:break-all">${pet.id.slice(0,8).toUpperCase()}</span></div>
+      </div>
+      <div class="idc-footer">
+        <div class="idc-logo">🐾 PetCare · ${new Date().toLocaleDateString('tr-TR')}</div>
+        <div id="qr-container"></div>
+      </div>
+    </div>`;
+  // Generate QR with pet summary
+  setTimeout(()=>{
+    const qrEl=document.getElementById('qr-container');
+    if(qrEl&&typeof QRCode!=='undefined'){
+      qrEl.innerHTML='';
+      new QRCode(qrEl,{text:`PetCare\nAd: ${pet.name}\nTür: ${pet.type}${pet.breed?' ('+pet.breed+')':''}\nID: ${pet.id.slice(0,8).toUpperCase()}`,width:54,height:54,colorDark:'#ffffff',colorLight:'transparent'});
+    }
+  },50);
+  document.getElementById('idcard-modal').classList.add('open');
+}
+
+function printIdCard(){
+  const card=document.getElementById('the-id-card');if(!card)return;
+  const w=window.open('','_blank','width=400,height=500');
+  w.document.write(`<html><head><title>Kimlik Kartı</title><style>body{margin:20px;font-family:sans-serif;background:#f4f6fb}.id-card{background:linear-gradient(135deg,#6c63ff,#8b84ff);color:white;border-radius:16px;padding:20px;max-width:340px;position:relative;overflow:hidden}.id-card::before{content:'';position:absolute;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.08);top:-60px;right:-40px}.idc-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}.idc-avatar{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:2rem;overflow:hidden;border:2px solid rgba(255,255,255,.4)}.idc-avatar img{width:100%;height:100%;object-fit:cover}.idc-name{font-size:1.35rem;font-weight:700}.idc-breed{font-size:.82rem;opacity:.8;margin-top:2px}.idc-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}.idc-field label{font-size:.65rem;opacity:.7;text-transform:uppercase;letter-spacing:.5px;display:block}.idc-field span{font-size:.85rem;font-weight:600}.idc-footer{display:flex;align-items:center;justify-content:space-between}.idc-logo{font-size:.75rem;opacity:.7}canvas,img{width:54px!important;height:54px!important;border-radius:6px}</style></head><body>${card.outerHTML}<script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
+
+// ===================== MAP =====================
+let leafletMap=null,userMarker=null,poiMarkers=[];
+
+function initMap(){
+  if(leafletMap){leafletMap.invalidateSize();return;}
+  leafletMap=L.map('map').setView([39.925,32.866],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(leafletMap);
+}
+
+function searchNearby(){
+  const statusEl=document.getElementById('map-status');
+  statusEl.style.display='block';statusEl.textContent='📍 Konumunuz alınıyor...';
+  document.getElementById('map-result-list').innerHTML='';
+  if(!navigator.geolocation){statusEl.textContent='Konum erişimi desteklenmiyor.';return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude:lat,longitude:lng}=pos.coords;
+    if(!leafletMap)initMap();
+    leafletMap.setView([lat,lng],14);
+    if(userMarker)userMarker.remove();
+    userMarker=L.marker([lat,lng],{icon:L.divIcon({html:'📍',className:'',iconSize:[24,24]})}).addTo(leafletMap).bindPopup('📍 Konumunuz').openPopup();
+    // clear old POI markers
+    poiMarkers.forEach(m=>m.remove());poiMarkers=[];
+    const cat=document.getElementById('map-category').value;
+    const catLabel={'veterinary':'Veteriner','pet_shop':'Petshop','animal_shelter':'Barınak'}[cat]||cat;
+    statusEl.textContent=`🔍 Yakındaki ${catLabel} aranıyor...`;
+    const r=5000;
+    const query=`[out:json][timeout:20];node["amenity"="${cat}"](around:${r},${lat},${lng});out body 20;`;
+    fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(query)})
+      .then(r=>r.json())
+      .then(data=>{
+        const els=data.elements||[];
+        if(!els.length){statusEl.textContent=`Yakında ${catLabel} bulunamadı.`;return;}
+        statusEl.style.display='none';
+        const results=[];
+        els.forEach(e=>{
+          const name=e.tags?.name||catLabel;
+          const addr=[e.tags?.['addr:street'],e.tags?.['addr:housenumber'],e.tags?.['addr:city']].filter(Boolean).join(' ');
+          const phone=e.tags?.phone||e.tags?.['contact:phone']||'';
+          const dist=calcDist(lat,lng,e.lat,e.lon);
+          results.push({name,addr,phone,lat:e.lat,lon:e.lon,dist});
+          const icon=L.divIcon({html:`<div style="background:var(--primary,#6c63ff);color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:0.8rem;box-shadow:0 2px 6px rgba(0,0,0,.3)">{'veterinary':'🏥','pet_shop':'🛒','animal_shelter':'🏠'}['${cat}']||'📍'</div>`,className:'',iconSize:[28,28]});
+          const marker=L.marker([e.lat,e.lon]).addTo(leafletMap);
+          marker.bindPopup(`<b>${name}</b>${addr?'<br>'+addr:''}${phone?'<br>📞 '+phone:''}<br><small>${dist} km uzakta</small>`);
+          poiMarkers.push(marker);
+        });
+        results.sort((a,b)=>a.dist-b.dist);
+        document.getElementById('map-result-list').innerHTML=results.map(r=>`
+          <div class="map-result-item" onclick="leafletMap.setView([${r.lat},${r.lon}],17)">
+            <div class="mri-icon">${{'veterinary':'🏥','pet_shop':'🛒','animal_shelter':'🏠'}[cat]||'📍'}</div>
+            <div><div class="mri-name">${esc(r.name)}</div>${r.addr?`<div class="mri-addr">📌 ${esc(r.addr)}</div>`:''}${r.phone?`<div class="mri-addr">📞 ${esc(r.phone)}</div>`:''}
+            <div class="mri-addr">📏 ${r.dist} km uzakta</div></div>
+          </div>`).join('');
+      })
+      .catch(()=>{statusEl.textContent='Arama başarısız. İnternet bağlantınızı kontrol edin.';});
+  },err=>{
+    statusEl.textContent='Konum alınamadı: '+err.message;
+  },{enableHighAccuracy:true,timeout:10000});
+}
+
+function calcDist(lat1,lon1,lat2,lon2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(1);
+}
+
+// ===================== UTILS =====================
+function getPet(){return state.pets.find(p=>p.id===state.currentPetId);}
+
+document.addEventListener('click',e=>{
+  const panel=document.getElementById('notif-panel');
+  if(panel.classList.contains('open')&&!panel.contains(e.target)&&!document.getElementById('bell-btn').contains(e.target))closeNotifPanel();
+});
+
+// ===================== PWA =====================
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install-banner').style.display='flex';});
+document.getElementById('install-btn').addEventListener('click',()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-banner').style.display='none';});}});
+window.addEventListener('appinstalled',()=>{document.getElementById('install-banner').style.display='none';});
+
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+
+// Reminder notifications
+if('Notification' in window && Notification.permission==='default'){setTimeout(()=>Notification.requestPermission(),3000);}
+function checkAlerts(){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const now=new Date(),hhmm=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  getTodayReminders().forEach(r=>{if(r.time===hhmm){const pn=r.petIds.map(id=>{const p=state.pets.find(pp=>pp.id===id);return p?p.name:'';}).filter(Boolean).join(', ');new Notification('🐾 PetCare — '+r.title,{body:pn||'Hatırlatıcı zamanı!',tag:r.id+hhmm});}});
+}
+setInterval(checkAlerts,60000);
+
+// ===================== INIT =====================
+loadState();
+renderHome();
+</script>
+</body>
+</html>
